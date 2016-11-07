@@ -1,7 +1,42 @@
-pypiserver:
-  image: pypiserver
-  volumes:
-    - /var/pypiserver:/data
-  command: -p 80 -P /data/.htaccess -a update,download,list /data/packages
-  ports:
-    - "8080:80"
+version: '2'
+
+services:
+  log:
+    build: ./deploy/log/
+    restart: always
+    volumes:
+      - /var/log/pypiserver/:/var/log/docker/
+    ports:
+      - 1514:514
+
+  pypiserver:
+    build: .
+    restart: always
+    volumes:
+      - /var/pypiserver:/data
+    command: -p 80 -P /data/.htaccess -a update /data/packages
+    depends_on:
+      - log
+    logging:
+      driver: "syslog"
+      options:
+        syslog-address: "tcp://127.0.0.1:1514"
+        tag: "pypiserver"
+
+  nginx:
+    image: library/nginx:1.9
+    restart: always
+    volumes:
+      - /var/pypiserver:/data
+      - ./deploy/nginx:/etc/nginx
+    ports:
+      - "8080:80"
+    depends_on:
+      - pypiserver
+      - log
+    logging:
+      driver: "syslog"
+      options:  
+        syslog-address: "tcp://127.0.0.1:1514"
+        tag: "proxy"
+   
